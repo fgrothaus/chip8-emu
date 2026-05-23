@@ -3,7 +3,7 @@
 #include "cpu.h"
 
 int main() {
-
+    // run code: make run
     Chip8 chip8;
 
 
