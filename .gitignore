@@ -93,3 +93,4 @@ dkms.conf
 
 # custom
 /chip8 # Bezieht sich ausschließlich auf root Verzeichnis.
+chip8
