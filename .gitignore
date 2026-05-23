@@ -90,3 +90,6 @@ dkms.conf
 .ionide
 
 # End of https://www.toptal.com/developers/gitignore/api/linux,c,visualstudiocode
+
+# custom
+/chip8 # Bezieht sich ausschließlich auf root Verzeichnis.
