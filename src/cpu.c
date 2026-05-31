@@ -159,6 +159,8 @@ void chip8_cycle(Chip8* chip8) {
             break;
         case 0x1000:
             // 1NNN Springe zur Adresse NNN (Jump)
+            // Die {}-Brackets sind notwendig, um den Geltungsbereich der Variablen nur innerhalb des cases zu halten,
+            // da die Adresse nnn häufiger benötigt wird
             {
                 uint16_t nnn = opcode & 0x0FFF; // Eine Adresse ist 3 Nibble groß. Es gibt also 2^12 = 4096 Adressen (siehe MEMORY_SIZE)
                 chip8->pc = nnn;
