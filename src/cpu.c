@@ -25,6 +25,16 @@
 // 00000080  00 e0 00 e0                                       |....|
 // 00000084
 
+
+// Jedes Zeichen besteht aus fünf Byte. Beispiel für 0:
+// F0 = 11110000 => 1111
+// 90 = 10010000 => 1  1
+// 90 = 10010000 => 1  1
+// 90 = 10010000 => 1  1
+// F0 = 11110000 => 1111
+// Die 1en formen die Zeichen (in dem Fall die 0)
+// Es würde für das Formen der Zeichen auch ein Nibble reichen, aber die kleinste Einheit auf einem Computer ist ein Byte, deswegen wird das hintere Nibble nicht genutzt.
+
 uint8_t fontset[80] = {
     0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
     0x20, 0x60, 0x20, 0x20, 0x70, // 1
@@ -124,12 +134,22 @@ void chip8_cycle(Chip8* chip8) {
 
         case 0x0000:
             // 00E0 Bildschirm löschen
-            // 00EE Unterprogramm-Rücksprung
+            // 00EE Unterprogramm-Rücksprung (return) von ausgeführtem Opcode
             switch (opcode) {
                 case 0x00E0:
-                    for (int i = 0; i < 62*32; i++) chip8->display[i] = 0;
+                    for (int i = 0; i < 64*32; i++) chip8->display[i] = 0;
                     printf("  [EXECUTE] Bildschirm gelöscht.\n");
+                    break;
                 case 0x00EE:
+                    if (chip8->sp > 0)
+                    {
+                        chip8->sp--;
+                        chip8->pc = chip8->stack[chip8->sp]; // Hier steht die vorherige Adresse drin, damit der pc weitermachen kann.
+                        printf("  [EXECUTE] Rücksprung aus Unterprogramm zu Adresse: 0x%03X\n", chip8->pc);
+                    } else {
+                        printf("  [FEHLER] Stack Underflow! Kein Unterprogramm aktiv.\n");
+                    }
+                    
                     break;
                 default:
                     printf("  [FEHLER] Unbekannter 0x0000 Opcode: 0x%04X\n", opcode);
@@ -139,27 +159,78 @@ void chip8_cycle(Chip8* chip8) {
             break;
         case 0x1000:
             // 1NNN Springe zur Adresse NNN (Jump)
+            {
+                uint16_t nnn = opcode & 0x0FFF; // Eine Adresse ist 3 Nibble groß. Es gibt also 2^12 = 4096 Adressen (siehe MEMORY_SIZE)
+                chip8->pc = nnn;
+            }
             break;
         case 0x2000:
-            // 2NNN Rufe Unterprogramm auf Adresse NNN auf (Call)
+            // 2NNN Rufe Unterprogramm auf Adresse NNN auf (Call) - 0x2NNN = Gegenstück zu 0x00EE
+            {
+                uint16_t nnn = opcode & 0x0FFF;
+                if (chip8->sp < STACK_SIZE)
+                {
+                    chip8->stack[chip8->sp] = chip8->pc;
+                    chip8->sp++;
+                    chip8->pc = nnn;
+                    printf("  [EXECUTE] Call Unterprogramm bei: 0x%03X (Rücksprung zu: 0x%03X)\n", nnn, chip8->stack[chip8->sp - 1]);
+                } else {
+                    printf("  [FEHLER] Stack Overflow! Zu viele Unterprogramme verschachtelt.\n");
+                }
+                
+            }
             break;
         case 0x3000:
-            // 3XNN Überspringe nächsten Befehl, wenn Vx == NN
+            // 3XNN Überspringe nächsten Befehl, wenn Vx == NN. Quasi das if (ohne else) Konstrukt in Assembler/Opcodes bei Gleichheit
+            {
+                uint8_t x = (opcode & 0x0F00) >> 8;
+                uint8_t nn = opcode & 0x00FF;
+                
+                if (chip8->V[x] == nn)
+                {
+                    chip8->pc += 2;
+                }
+            }
             break;
         case 0x4000:
-            // 4XNN Überspringe nächsten Befehl, wenn Vx != NN
+            // 4XNN Überspringe nächsten Befehl, wenn Vx != NN. Quasi das if (ohne else) Konstrukt in Assembler/Opcodes bei Gleichheit
+            {
+                uint8_t x = (opcode & 0x0F00) >> 8;
+                uint8_t nn = opcode & 0x00FF;
+                
+                if (chip8->V[x] != nn)
+                {
+                    chip8->pc += 2;
+                }
+            }
             break;
         case 0x5000:
             // 5XY0 Überspringe nächsten Befehl, wenn Vx == Vy
+            {
+                uint8_t x = (opcode & 0x0F00) >> 8;
+                uint8_t y = (opcode & 0x00F0) >> 4;
+
+                if (chip8->V[x] == chip8->V[y])
+                {
+                    chip8->pc += 2;
+                }
+            }            
             break;
         case 0x6000:
             // 6XNN Setze Register Vx (Index der CPU) auf den Wert NN
-            uint8_t x = (opcode & 0x0F00) >> 8; // 1010 0101 1111 0111 => 1. 0000 0101 0000 0000 2. 0000 0000 0000 0101
-            uint8_t nn = opcode & 0x00FF;
-            chip8->V[x] = nn; // V entspricht den CPU Registern. Der Opcode wurde aus dem RAM in das entsprechende CPU-Register geladen
+            {
+                uint8_t x = (opcode & 0x0F00) >> 8; // 1010 0101 1111 0111 => 1. 0000 0101 0000 0000 2. 0000 0000 0000 0101
+                uint8_t nn = opcode & 0x00FF;
+                chip8->V[x] = nn; // V entspricht den CPU Registern. Der Opcode wurde aus dem RAM in das entsprechende CPU-Register geladen
+            }
             break;
         case 0x7000:
             // 7XNN Addiere den Wert NN zum Register Vx
+            {
+                uint8_t x = (opcode & 0x0F00) >> 8;
+                uint8_t nn = opcode & 0x00FF;
+                chip8->V[x] += nn;
+            }
             break;
         case 0x8000:
             // 9 Befehle: 8XY0-8XYE Mathematische Operationen. Hier teilen sich 9 Befehle das 8er-Register! Du prüfst sie am Ende mit opcode & 0x000F

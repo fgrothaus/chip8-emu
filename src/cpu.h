@@ -17,7 +17,7 @@ typedef struct
     uint8_t  delay_timer;           // Zählt mit 60Hz runter (für Timing)
     uint8_t  sound_timer;           // Zählt mit 60Hz runter (beim Wert > 0 piept's)
 
-    uint8_t  display[64 * 32];      // Der Bildschirm-Buffer (Pixel an/aus)
+    uint8_t  display[64 * 32];      // Der Bildschirm-Buffer - 2048 Pixel (Pixel an/aus)
     uint8_t  keypad[16];            // Status der 16 Tasten
 }Chip8;
 
