@@ -195,7 +195,7 @@ void chip8_cycle(Chip8* chip8) {
             }
             break;
         case 0x4000:
-            // 4XNN Überspringe nächsten Befehl, wenn Vx != NN. Quasi das if (ohne else) Konstrukt in Assembler/Opcodes bei Gleichheit
+            // 4XNN Überspringe nächsten Befehl, wenn Vx != NN. Quasi das if (ohne else) Konstrukt in Assembler/Opcodes bei Ungleichheit
             {
                 uint8_t x = (opcode & 0x0F00) >> 8;
                 uint8_t nn = opcode & 0x00FF;
@@ -236,6 +236,18 @@ void chip8_cycle(Chip8* chip8) {
             break;
         case 0x8000:
             // 9 Befehle: 8XY0-8XYE Mathematische Operationen. Hier teilen sich 9 Befehle das 8er-Register! Du prüfst sie am Ende mit opcode & 0x000F
+            
+            // Bsp. 8XY4: Addiere Vy zu Vx, setze VF auf 1, wenn es einen Überlauf gibt, sonst auf 0
+            // Überlauf heißt z.B. wenn V0 + V1 > 255 ist, hat Wert 9 Bit, deswegen wird das MSB abgeschnitten und das VF Register auf 1 gesetzt.
+            // Danach wird ein anderes Register z.B. V2 um 1 erhöht.
+            // Je nach Programmierung wird danach VF wieder auf 0 gesetzt (sofern ein Befehl ausgeüfhrt wird, der VF neu berechnet).
+            // Der Überlauf kann öfter stattfinden,
+            // bevor gezeichnet wird, damit danach dann die Adresse im RAM für das Zeichen aus dem Fontset gefunden werden kann.
+            
+            // Das Überlaufregister kann aber auch anders genutzt werden. Z.B. wenn VF = 1 ist, würde bei Pong der Ball abprallen.
+            
+            // Register VF ist grundsätzlich für alle Chip-8 Entwickler als Flag-Register
+
             break;
         case 0x9000:
             // 9XY0 Überspringe nächsten Befehl, wenn Vx != Vy
