@@ -235,36 +235,194 @@ void chip8_cycle(Chip8* chip8) {
             }
             break;
         case 0x8000:
-            // 9 Befehle: 8XY0-8XYE Mathematische Operationen. Hier teilen sich 9 Befehle das 8er-Register! Du prüfst sie am Ende mit opcode & 0x000F
-            
-            // Bsp. 8XY4: Addiere Vy zu Vx, setze VF auf 1, wenn es einen Überlauf gibt, sonst auf 0
-            // Überlauf heißt z.B. wenn V0 + V1 > 255 ist, hat Wert 9 Bit, deswegen wird das MSB abgeschnitten und das VF Register auf 1 gesetzt.
-            // Danach wird ein anderes Register z.B. V2 um 1 erhöht.
-            // Je nach Programmierung wird danach VF wieder auf 0 gesetzt (sofern ein Befehl ausgeüfhrt wird, der VF neu berechnet).
-            // Der Überlauf kann öfter stattfinden,
-            // bevor gezeichnet wird, damit danach dann die Adresse im RAM für das Zeichen aus dem Fontset gefunden werden kann.
-            
-            // Das Überlaufregister kann aber auch anders genutzt werden. Z.B. wenn VF = 1 ist, würde bei Pong der Ball abprallen.
-            
-            // Register VF ist grundsätzlich für alle Chip-8 Entwickler als Flag-Register
+            {
+                // 9 Befehle: 8XY0-8XYE Mathematische Operationen. Hier teilen sich 9 Befehle das 8er-Register! Du prüfst sie am Ende mit opcode & 0x000F
+                
+                // Bsp. 8XY4: Addiere Vy zu Vx, setze VF auf 1, wenn es einen Überlauf gibt, sonst auf 0
+                // Überlauf heißt z.B. wenn V0 + V1 > 255 ist, hat Wert 9 Bit, deswegen wird das MSB abgeschnitten und das VF Register auf 1 gesetzt.
+                // Danach wird ein anderes Register z.B. V2 um 1 erhöht.
+                // Je nach Programmierung wird danach VF wieder auf 0 gesetzt (sofern ein Befehl ausgeüfhrt wird, der VF neu berechnet).
+                // Der Überlauf kann öfter stattfinden,
+                // bevor gezeichnet wird, damit danach dann die Adresse im RAM für das Zeichen aus dem Fontset gefunden werden kann.
+                // Das Überlaufregister kann aber auch anders genutzt werden. Z.B. wenn VF = 1 ist, würde bei Pong der Ball abprallen.
+                // Register VF ist grundsätzlich für alle Chip-8 Entwickler als Flag-Register
 
-            break;
+
+                uint8_t x = (opcode & 0x0F00) >> 8;
+                uint8_t y = (opcode & 0x00F0) >> 4;
+                uint8_t last_nibble = opcode & 0x000F;
+                
+                switch (last_nibble) {
+                    case 0x0:
+                        // 8XY0 Setze Vx auf den Wert von Vy
+                        chip8->V[x] = chip8->V[y];
+                        break;
+                    case 0x1:
+                        {
+                            // 8XY1 -> Bitweises ODER 0101 | 1001 => 1101
+                            chip8->V[x] |= chip8->V[y];
+                            break;
+                        }
+                    case 0x2:
+                        {
+                            // 8XY1 -> Bitweises UND 0101 & 1001 => 0001
+                            chip8->V[x] &= chip8->V[y];
+                            break;
+                        }
+                    case 0x3:
+                        {
+                            // 8XY1 -> Bitweises Exclusives ODER 0101 ^ 1001 => 1100
+                            chip8->V[x] ^= chip8->V[y];
+                            break;
+                        }
+                    case 0x4:
+                        {
+                            // 8XY4 Addiere Vy zu Vx, setze VF auf 1, wenn es einen Überlauf gib, sonst auf 0
+                            if (chip8->V[y] > (255 - chip8->V[x]))
+                            {
+                                // z.B. 30 > (255 - 230) => 30 > 25 => Es dürfen nur noch 25 rein, deswegen sind 30 zu groß
+                                chip8->V[0xF] = 1; // Überlauf
+                            } else {
+                                chip8->V[0xF] = 0; // Kein Überlauf
+                            }
+
+                            chip8->V[x] += chip8->V[y];
+                            break;
+                        }
+                    case 0x5:
+                        {
+                            // 8XY5 Subtrahiere Vy von Vx
+                            // Bei der Subtraktion wird VF auf 1 gesetzt, um zu signalisieren, dass alles ok ist. Nicht wie bei der Addition. 
+                             if (chip8->V[x] >= chip8->V[y])
+                            {
+                                chip8->V[0xF] = 1; // Kein Unterlauf
+                            } else {
+                                chip8->V[0xF] = 0; // Unterlauf
+                            }
+                            
+                            chip8->V[x] -= chip8->V[y]; // -= oder += sagen dem Compiler, dass zu verrechnender Wert und Zielwert gleich sind und mit VY verrechnet werden sollen.
+                            // Bei chip8->V[x] = chip8->V[x] - chip8->V[y]; würde der Compiler Zieladresse und zu verrechnende Adressen ermitteln. mit -= ist es kompakter.
+                            break;
+                        }
+                    case 0x6:
+                        {   
+                            // Bit-Shift nach rechts. Das rausgerutschte Bit wird in VF gespeichert.
+                            // Letztes Bit von V[x] extrahieren und in VF speichern
+                            uint8_t last_bit = chip8->V[x] & 0x01; // Kann auch mit 0b00000001 maskiert werden
+
+                            chip8->V[0xF] = last_bit;
+                            chip8->V[x] >>= 1;                        
+                            break;
+                        }
+                    case 0xE:
+                        {
+                            // Bit-Shift nach links. Das rausgerutschte Bit wird in VF gespeichert.
+                            uint8_t first_bit = (chip8->V[x] & 0x80) >> 7; // 0x80, weil eine Ziffer ein Nibble ist. 1 Byte = 8 Bit =>
+                            // MERKE: Beim Ermitteln des richtigen Hexawertes: Jedes Bit im Nibble entspricht einer zweier Potenz: 1000 = 8, 0100 = 4, 0010 = 2.
+
+                            chip8->V[0xF] = first_bit;
+                            chip8->V[x] <<= 1;
+                            break;
+                        }
+                }
+
+
+                break;
+            }
         case 0x9000:
             // 9XY0 Überspringe nächsten Befehl, wenn Vx != Vy
-            break;
+            {
+                uint8_t x = (opcode & 0x0F00) >> 8;
+                uint8_t y = (opcode & 0x00F0) >> 4;
+
+                if (chip8->V[x] != chip8->V[y])
+                {
+                    chip8->pc += 2;
+                }
+                break;
+            }
         case 0xA000:
-            // ANNN Setze Index-Register I auf Adresse NNN
-            // HIER
-            break;
+            {
+                // ANNN Setze Index-Register I auf Adresse NNN -> Befehl, um der CPU zu sagen, wo sie im RAM nach Grafiken oder Daten suchen soll.
+                // I ist ein einfaches Register (Variable), die genau eine Adresse im RAM speichert.
+                chip8->I = opcode & 0x0FFF;
+                break;
+            }
         case 0xB000:
-            // BNNN Springe zur Adresse NNN + V0
+            {
+                // BNNN Springe zur Adresse NNN + V0
+                uint16_t nnn = (opcode & 0x0FFF);
+                
+                // Logik von nnn + V[0] -> z.B. Menü Auswahl steht z.B. an Adresse 0x300 =>
+                // 0xB300 + V[0] (0) = Spiel starten (0x300)
+                // 0xB300 + V[0] (1) = Optionen öffnen (0x301)
+                // 0xB300 + V[0] (2) = Credits anzeigen (0x302)
+                chip8->pc = nnn + chip8->V[0x00];
             break;
+            }
         case 0xC000:
-            // CXNN Setze Vx auf eine Zufallszahl, die mit NN per UND verknüpft wird
-            break;
+            {
+                // CXNN Setze Vx auf eine Zufallszahl, die mit NN per UND verknüpft wird
+                uint8_t x = (opcode & 0x0F00) >> 8;
+                uint8_t nn = opcode & 0x00FF;
+                
+                // Damit kann in einem Spiel beispielsweise ein Raumschiff an einer zufälligen Stellen spawnen.
+                // das % 256 ist nicht notwendig. Es kann auch einfach rand() & nn gerechnet werden, da & nn alles wegknipst, was über
+                // die maximale Pixelbreite von 64 Pixeln geht.
+                chip8->V[x] = (rand() % 256) & nn; // Bsp: nn = 63 = 0b00111111 => rand & 0b00111111 = Maximal 63
+                break;
+            }
         case 0xD000:
-            // DXYN Der wichtigste Befehl! Zeichne ein Sprite auf den Bildschirm
-            break;
+            {
+                // DXYN Der wichtigste Befehl! Zeichne ein Sprite auf den Bildschirm -> Liest gesetzte Adresse durch 0xA000 ein und zeichnet dann den Sprite.
+                uint8_t x = (opcode & 0x0F00) >> 8;
+                uint8_t y = (opcode & 0x00F0) >> 4;
+                uint8_t n = opcode & 0x000F; // Höhe des Sprites
+                
+                chip8->V[0xF] = 0;
+
+                // Start-Koordinaten zum Zeichnen des Sprites aus dem V-Register laden
+                // Modulo Trick sorgt dafür, dass Vx beim Überschreiten der maximalen Pixelbreite (64) einfach wieder auf der anderen Seite angezeigt wird.
+                // Bsp: 63 % 64 = 63; 66 % 64 = 2 => Geht wieder von links an los
+                uint8_t x_start = chip8->V[x] % 64; // Breite
+                uint8_t y_start = chip8->V[y] % 32; // Höhe
+
+                // Höhe des Sprites durchlaufen
+                for (uint8_t row = 0; row < n; row++)
+                {   
+                    // Das Sprite im RAM auslesen und speichern. memory speichert 1 Byte große Werte. I ist 2 Byte groß, um alle Adressen des RAMS finden zu können.
+                    uint8_t sprite_byte = chip8->memory[chip8->I + row];
+
+                    if (y_start + row >= 32) break; // Wenn das Sprite größer als die zulässige Höhe ist, wird aufgehört zu zeichnen.
+                
+                    // Ein Sprite ist genau ein Byte groß
+                    for (uint8_t col = 0; col < 8; col++)
+                    {
+                        // Wenn wir rechts über den Bildschirmrand laufen, brechen wir diese Zeile ab
+                        if (x_start + col >= 64) break;
+
+                        // Wenn (01101010 & 10000000 >> 0) != 0 => Es wird das Bit von vorne bis hinten durchgeshiftet und geguckt, wo eine 1 sitzt.
+                        // Für jede 1 wird ein Pixel gezeichnet.
+                        if ((sprite_byte & (0x80 >> col)) != 0)
+                        {   
+                            // Es wird mit 64 multipliziert, da das Array flachgeklopft werden muss. Der RAM ist nämlich 1D und nicht 2D (x, y)
+                            // Es wird praktisch vertikal die y-Achse entlang die gesamte x-Achse abgesucht nach Pixeln, die leuchten sollen.
+                            // Nach jedem durchlaufenen Byte, wird die Laufvariable row der y-Achse inkrementiert. Damit weiter in die korrekten Stellen geschrieben
+                            // werden kann, muss jede y_start + row mit 64 multipliziert werden. 
+                            int screen_index = (x_start + col) + ((y_start + row) * 64); // Position des Pixels bestimmen
+
+                            if (chip8->display[screen_index] == 1)
+                            {
+                                chip8->V[0xF] = 1; // Kollisionsprüfung. Wenn Kollision, wird VF Register auf 1 gesetzt => Entwickler entscheidet, wie er damit umgeht.
+                            }
+
+                            chip8->display[screen_index] ^= 1;
+                        }
+                    }
+                }
+
+                break;
+            }
         case 0xE000:
             // EX9E, EXA1 Tastaturabfragen, je nachdem, ob eine Taste gedrückt ist
             break;
