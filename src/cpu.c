@@ -389,9 +389,18 @@ void chip8_cycle(Chip8* chip8) {
 
                 // Höhe des Sprites durchlaufen
                 for (uint8_t row = 0; row < n; row++)
-                {   
+                {
+                    //Reihe (row)  | RAM-Inhalt (sprite_byte) | Was man auf dem Bildschirm sieht
+                    //-------------+--------------------------+----------------------------------
+                    //row = 0      | 0b11111111 (0xFF)        | ■ ■ ■ ■ ■ ■ ■ ■ (Sprite)
+                    //row = 1      | 0b11000000 (0xC0)        | ■ ■ (Sprite)
+                    //row = 2      | 0b11111100 (0xFC)        | ■ ■ ■ ■ ■ ■ (Sprite)
+                    //row = 3      | 0b11000000 (0xC0)        | ■ ■ (Sprite)
+                    //row = 4      | 0b11000000 (0xC0)        | ■ ■ (Sprite)
+
+
                     // Das Sprite im RAM auslesen und speichern. memory speichert 1 Byte große Werte. I ist 2 Byte groß, um alle Adressen des RAMS finden zu können.
-                    uint8_t sprite_byte = chip8->memory[chip8->I + row];
+                    uint8_t sprite_byte = chip8->memory[chip8->I + row]; // An I geht z.B. Zeichen F los
 
                     if (y_start + row >= 32) break; // Wenn das Sprite größer als die zulässige Höhe ist, wird aufgehört zu zeichnen.
                 
@@ -416,16 +425,20 @@ void chip8_cycle(Chip8* chip8) {
                                 chip8->V[0xF] = 1; // Kollisionsprüfung. Wenn Kollision, wird VF Register auf 1 gesetzt => Entwickler entscheidet, wie er damit umgeht.
                             }
 
-                            chip8->display[screen_index] ^= 1;
+                            chip8->display[screen_index] ^= 1; // XOR sorgt für Toggle
+                            // Das display Array ist in chip8_init vollständig mit 0 initialisiert worden. Wenn gezeichnet wird, wird aus der 0 eine 1 und dadurch das Pixel gezeichnet.
+                            // Bei Kollision wird das bereits leuchtende Pixel wieder ausgeschaltet.
                         }
                     }
                 }
-
                 break;
             }
         case 0xE000:
-            // EX9E, EXA1 Tastaturabfragen, je nachdem, ob eine Taste gedrückt ist
-            break;
+            {
+                // EX9E, EXA1 Tastaturabfragen, je nachdem, ob eine Taste gedrückt ist
+
+                break;
+            }
         case 0xF000:
             // 9 Befehle: Verschiedene Timer-, Tastatur- und Speicheroperationen (z. B. FX07, FX55). Werden über die letzten zwei Stellen (opcode & 0x00FF) unterschieden
             break;
