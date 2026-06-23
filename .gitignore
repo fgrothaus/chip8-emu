@@ -94,3 +94,10 @@ dkms.conf
 # custom
 /chip8 # Bezieht sich ausschließlich auf root Verzeichnis.
 chip8
+chip8.exe
+a.out
+
+# Lokale Windows-Bibliotheken ignorieren
+include/
+lib/
+SDL2.dll
