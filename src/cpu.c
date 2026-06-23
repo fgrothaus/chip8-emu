@@ -436,11 +436,98 @@ void chip8_cycle(Chip8* chip8) {
         case 0xE000:
             {
                 // EX9E, EXA1 Tastaturabfragen, je nachdem, ob eine Taste gedrückt ist
-
+                // Das Keypad sind Tastatureingaben, die für das Lenken oder schießen oder ähnliches konfiguriert werden können vom Entwickler.
+                // Am Ende wird Grafiklib, wie SDL2 mit Emulator verbunden und Tastatureingaben werden mit Tasten im Keypad gemappt.
+                uint8_t x = (opcode & 0x0F00) >> 8;
+                
+                switch (opcode & 0x00FF)
+                {
+                    case 0x9E:
+                        // EX9E Überspringe nächsten Befehl, wenn Taste Vx gedrückt ist
+                        if (chip8->keypad[chip8->V[x]] == 1)
+                        {
+                            chip8->pc += 2;
+                        }
+                        break;
+                    case 0xA1:
+                        // EXA1 Überspringe nächsten Befehl, wenn Taste Vx nicht gedrückt ist
+                        if (chip8->keypad[chip8->V[x]] == 0)
+                        {
+                            chip8->pc += 2;
+                        }
+                        break;
+                }
                 break;
             }
         case 0xF000:
             // 9 Befehle: Verschiedene Timer-, Tastatur- und Speicheroperationen (z. B. FX07, FX55). Werden über die letzten zwei Stellen (opcode & 0x00FF) unterschieden
-            break;
+            {
+                uint8_t x = (opcode & 0x0F00) >> 8;
+                
+                switch(opcode & 0x00FF)
+                {
+                    case 0x07:
+                    {   
+                        // Delay timer abfragen - Vx auf Wert von delay_timer setzen
+                        chip8->V[x] = chip8->delay_timer;
+                        break;
+                    }
+                    case 0x15:
+                    {
+                        // Delay timer setzen - delay_timer auf Wert von Vx setzen
+                        chip8->delay_timer = chip8->V[x];
+                        break;
+                    }
+                    case 0x18:
+                    {
+                        // Sound timer setzen - sound_timer auf Wert von Vx setzen
+                        chip8->sound_timer = chip8->V[x];
+                        break;
+                    }
+                    case 0x1E:
+                    {
+                        // Index Register (I) erhöhen um den Wert von Vx
+                        chip8->I += chip8->V[x];
+                        break;
+                    }
+                    case 0x29:
+                    {
+                        // Hier steht in x der nackte Zahlenwert des Zeichens, welches gezeichnet werden soll 0-F
+                        // Die Fonts beginnen im RAM ab Adresse 0x50. Deswegen wird zum finden des Fontsets für das Zeichen F
+                        // 0x50 + (15 * 5) gerechnet, da so dann die Stelle ermittelt wird, an der F beginnt.
+                        chip8->I = 0x50 + (chip8->V[x] * 5); // Für 0 => 0x50 + (0*5) = 0x50; Für 1 => 0x50 + (1*5) = 0x50 + 5;
+                        break;
+                    }
+                    case 0x33:
+                    {
+                        // Binär codierte Dezimalzahl (BCD) aus Vx laden (1 Byte groß => 0-255)
+                        // und im RAM an der Stelle des Index Registers der Reihe nach ablegen (I, I+1, I+2)
+                        // Bsp. Zahl 254:
+                        chip8->memory[chip8->I] = chip8->V[x] / 100; // 254 / 100 = 2,54 => 2 zu uint8_t gecastet
+                        chip8->memory[chip8->I + 1] = (chip8->V[x] / 10) % 10; // (254 / 10) % 10 = 25,4 % 10 = 5,4 => 5 zu uint8_t gecastet
+                        chip8->memory[chip8->I + 2] = chip8->V[x] % 10; // 254 % 10 = 4 => 4 ohne cast
+                        break;
+                    }
+                    case 0x55:
+                    {
+                        // Register Dump: Werte von V0-Vx in dem RAM ab Adresse I kopieren
+                        for (int i = 0; i <= x; i++)
+                        {
+                            chip8->memory[chip8->I + i] = chip8->V[i];
+                        }
+                        break;
+                    }
+                    case 0x65:
+                    {
+                        // Register Dump: Werte von der CPU V0-Vx in den RAM an der Stelle I bis I+16 kopieren
+                        for (int i = 0; i <= x; i++)
+                        {
+                            chip8->V[i] = chip8->memory[chip8->I + i];
+                        }
+                        break;
+                    }
+                }
+                break;
+            }
     }
 }
