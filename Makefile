@@ -1,6 +1,6 @@
 # 1. Betriebssystem automatisch erkennen
 ifeq ($(OS),Windows_NT)
-    # --- WINDOWS SETUP ---
+    # --- WINDOWS SETUP --- run Programm: mingw32-make run 
     TARGET = chip8.exe
     RM = del /Q /F
     # Das Windows-Compiler-Monster mit allen System-Bibliotheken
