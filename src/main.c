@@ -37,7 +37,7 @@ int main(int argc, char* argv[])
     Chip8 chip8;
 
     chip8_init(&chip8);
-    chip8_load_rom(&chip8, "roms/IBM Logo.ch8");
+    chip8_load_rom(&chip8, "roms/Pong.ch8");
 
     printf("\n--- SPEICHER-KONTROLLE ---\n");
     printf("Byte bei RAM-Adresse 0x200: 0x%02X\n", chip8.memory[0x200]);
@@ -72,6 +72,30 @@ int main(int argc, char* argv[])
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) {
                 running = 0;
+            }
+            else if (event.type == SDL_KEYDOWN) {
+                switch (event.key.keysym.sym) {
+                    case SDLK_1: chip8.keypad[0x1] = 1; break; // Links Hoch
+                    case SDLK_q: chip8.keypad[0x4] = 1; break; // Links Runter
+                    
+                    case SDLK_2: chip8.keypad[0x2] = 1; break; // Rechts Hoch (Variante 1)
+                    case SDLK_w: chip8.keypad[0x5] = 1; break; // Rechts Runter (Variante 1)
+                    
+                    case SDLK_4: chip8.keypad[0xC] = 1; break; // Rechts Hoch (Variante 2)
+                    case SDLK_r: chip8.keypad[0xD] = 1; break; // Rechts Runter (Variante 2)
+                }
+            }
+            else if (event.type == SDL_KEYUP) {
+                switch (event.key.keysym.sym) {
+                    case SDLK_1: chip8.keypad[0x1] = 0; break;
+                    case SDLK_q: chip8.keypad[0x4] = 0; break;
+                    
+                    case SDLK_2: chip8.keypad[0x2] = 0; break;
+                    case SDLK_w: chip8.keypad[0x5] = 0; break;
+                    
+                    case SDLK_4: chip8.keypad[0xC] = 0; break;
+                    case SDLK_r: chip8.keypad[0xD] = 0; break;
+                }
             }
         }
 
